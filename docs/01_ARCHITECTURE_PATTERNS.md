@@ -190,18 +190,20 @@ Each layer has a single responsibility:
 
 ### 2. Inversion at the Adapter Boundary
 
-The kitchen defines ports; cookbooks provide adapters.
+CrucibleTrain and CrucibleTelemetry define ports; crucible_kitchen provides adapters. Cookbooks provide recipes/config only.
 ```elixir
-# Kitchen defines:
-defmodule CrucibleKitchen.Ports.TrainingClient do
-  @callback start_session(config :: map()) :: {:ok, session} | {:error, term()}
-  @callback forward_backward(session, datums) :: {:ok, future} | {:error, term()}
+# Port (in crucible_train):
+defmodule CrucibleTrain.Ports.TrainingClient do
+  @callback start_session(adapter_opts, config :: map()) :: {:ok, session} | {:error, term()}
+  @callback forward_backward(adapter_opts, session, datums) :: future
+  @callback optim_step(adapter_opts, session, lr :: float()) :: future
+  @callback await(adapter_opts, future) :: {:ok, map()} | {:error, term()}
   # ...
 end
 
-# Cookbook provides:
-defmodule TinkexCookbook.Adapters.TrainingClient do
-  @behaviour CrucibleKitchen.Ports.TrainingClient
+# Kitchen provides:
+defmodule CrucibleKitchen.Adapters.Tinkex.TrainingClient do
+  @behaviour CrucibleTrain.Ports.TrainingClient
   # Implementation using Tinkex SDK
 end
 ```
@@ -293,7 +295,7 @@ A single context map flows through the workflow, accumulating state:
 
 1. **CrucibleKitchen.Workflow** module - DSL for workflow definition
 2. **CrucibleKitchen.Stage** behaviour - Contract for stage implementations
-3. **CrucibleKitchen.Ports.*** - Port behaviours (extend from crucible_train)
+3. **CrucibleTrain.Ports.*** and **CrucibleTelemetry.Ports.MetricsStore** - Shared port behaviours
 4. **CrucibleKitchen.Context** - Flowing state container
 5. **CrucibleKitchen.Runner** - Workflow executor with telemetry
 6. **CrucibleKitchen.Telemetry** - Event definitions and handlers

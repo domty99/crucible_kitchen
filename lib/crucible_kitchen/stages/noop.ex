@@ -5,6 +5,7 @@ defmodule CrucibleKitchen.Stages.Noop do
 
   use CrucibleKitchen.Stage
 
+  @doc "Returns the stage name `:noop`."
   @impl true
   def name, do: :noop
 

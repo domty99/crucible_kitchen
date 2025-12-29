@@ -36,12 +36,78 @@ defmodule CrucibleKitchen.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Path to North-Shore-AI repos (development mode)
+  @nsai_path "../"
+
   defp deps do
     [
-      # Core dependencies
-      {:crucible_train, "~> 0.2.0", optional: true},
-      {:crucible_ir, "~> 0.2.0", optional: true},
+      # ==========================================================================
+      # CRUCIBLE CORE - Foundational infrastructure
+      # ==========================================================================
+      {:crucible_ir, path: "#{@nsai_path}crucible_ir", override: true},
+      {:crucible_framework, path: "#{@nsai_path}crucible_framework", override: true},
+      {:crucible_bench, path: "#{@nsai_path}crucible_bench", override: true},
+
+      # ==========================================================================
+      # CRUCIBLE TRAINING - ML training infrastructure
+      # ==========================================================================
+      {:crucible_train, path: "#{@nsai_path}crucible_train", override: true},
+
+      # ==========================================================================
+      # CRUCIBLE MLOPS - Model lifecycle management
+      # ==========================================================================
+      {:crucible_model_registry, path: "#{@nsai_path}crucible_model_registry", override: true},
+      {:crucible_deployment, path: "#{@nsai_path}crucible_deployment", override: true},
+      {:crucible_feedback, path: "#{@nsai_path}crucible_feedback", override: true},
+
+      # ==========================================================================
+      # CRUCIBLE OBSERVABILITY - Telemetry, tracing, harness
+      # ==========================================================================
+      {:crucible_telemetry, path: "#{@nsai_path}crucible_telemetry", override: true},
+      {:crucible_trace, path: "#{@nsai_path}crucible_trace", override: true},
+      {:crucible_harness, path: "#{@nsai_path}crucible_harness", override: true},
+      {:crucible_datasets, path: "#{@nsai_path}crucible_datasets", override: true},
+
+      # ==========================================================================
+      # CRUCIBLE RELIABILITY - Ensemble, hedging, adversarial
+      # ==========================================================================
+      {:crucible_ensemble, path: "#{@nsai_path}crucible_ensemble", override: true},
+      {:crucible_hedging, path: "#{@nsai_path}crucible_hedging", override: true},
+      {:crucible_adversary, path: "#{@nsai_path}crucible_adversary", override: true},
+      {:crucible_xai, path: "#{@nsai_path}crucible_xai", override: true},
+
+      # ==========================================================================
+      # HUGGINGFACE INTEGRATION
+      # ==========================================================================
+      {:hf_hub, path: "#{@nsai_path}hf_hub_ex", override: true},
+      {:hf_datasets_ex, path: "#{@nsai_path}hf_datasets_ex", override: true},
+
+      # ==========================================================================
+      # EVALUATION & CONFIG
+      # ==========================================================================
+      {:eval_ex, path: "#{@nsai_path}eval_ex", override: true},
+      {:chz_ex, path: "#{@nsai_path}chz_ex", override: true},
+
+      # ==========================================================================
+      # TOKENIZATION
+      # ==========================================================================
+      {:tiktoken_ex, path: "#{@nsai_path}tiktoken_ex", override: true},
+
+      # ==========================================================================
+      # PYTHON BRIDGE (stable, from hex)
+      # ==========================================================================
+      {:snakebridge, "~> 0.6.0"},
+
+      # ==========================================================================
+      # TINKEX SDK (Backend adapter reference implementation)
+      # ==========================================================================
+      {:tinkex, path: "#{@nsai_path}tinkex", override: true},
+
+      # ==========================================================================
+      # EXTERNAL DEPENDENCIES
+      # ==========================================================================
       {:telemetry, "~> 1.2"},
+      {:telemetry_metrics, "~> 1.0", override: true},
       {:jason, "~> 1.4"},
 
       # Dev/test
@@ -74,19 +140,51 @@ defmodule CrucibleKitchen.MixProject do
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       },
       maintainers: ["North-Shore-AI"],
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files:
+        ~w(lib assets docs/guides docs/00_EXECUTIVE_SUMMARY.md docs/01_ARCHITECTURE_PATTERNS.md docs/02_COMPONENT_DESIGN.md docs/03_WORKFLOW_ENGINE.md docs/04_API_SURFACE.md docs/05_IMPLEMENTATION_ROADMAP.md docs/06_ECOSYSTEM_INTEGRATION.md .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
   defp docs do
     [
       main: "readme",
+      source_ref: "v#{@version}",
+      assets: %{"assets" => "assets"},
+      logo: "assets/crucible_kitchen.svg",
       extras: [
         "README.md",
         "CHANGELOG.md",
+        # Guides
         "docs/guides/getting_started.md",
         "docs/guides/custom_workflows.md",
-        "docs/guides/adapters.md"
+        "docs/guides/adapters.md",
+        "docs/guides/telemetry.md",
+        # Architecture
+        "docs/00_EXECUTIVE_SUMMARY.md",
+        "docs/01_ARCHITECTURE_PATTERNS.md",
+        "docs/02_COMPONENT_DESIGN.md",
+        "docs/03_WORKFLOW_ENGINE.md",
+        "docs/04_API_SURFACE.md",
+        "docs/05_IMPLEMENTATION_ROADMAP.md",
+        "docs/06_ECOSYSTEM_INTEGRATION.md"
+      ],
+      groups_for_extras: [
+        Introduction: ["README.md", "CHANGELOG.md"],
+        Guides: [
+          "docs/guides/getting_started.md",
+          "docs/guides/custom_workflows.md",
+          "docs/guides/adapters.md",
+          "docs/guides/telemetry.md"
+        ],
+        Architecture: [
+          "docs/00_EXECUTIVE_SUMMARY.md",
+          "docs/01_ARCHITECTURE_PATTERNS.md",
+          "docs/02_COMPONENT_DESIGN.md",
+          "docs/03_WORKFLOW_ENGINE.md",
+          "docs/04_API_SURFACE.md",
+          "docs/05_IMPLEMENTATION_ROADMAP.md",
+          "docs/06_ECOSYSTEM_INTEGRATION.md"
+        ]
       ],
       groups_for_modules: [
         Core: [
@@ -97,12 +195,8 @@ defmodule CrucibleKitchen.MixProject do
           CrucibleKitchen.Workflow
         ],
         Ports: [
-          CrucibleKitchen.Ports.TrainingClient,
-          CrucibleKitchen.Ports.DatasetStore,
-          CrucibleKitchen.Ports.BlobStore,
-          CrucibleKitchen.Ports.HubClient,
-          CrucibleKitchen.Ports.MetricsStore,
-          CrucibleKitchen.Ports.VectorStore
+          CrucibleKitchen.Ports,
+          CrucibleKitchen.Ports.Completer
         ],
         "Built-in Workflows": [
           CrucibleKitchen.Workflows.Supervised,

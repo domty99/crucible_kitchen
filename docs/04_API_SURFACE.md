@@ -231,7 +231,7 @@ end
 
 ## Adapter Registration API
 
-For cookbooks that provide adapters:
+For apps that provide adapters:
 
 ```elixir
 defmodule CrucibleKitchen.Adapters do

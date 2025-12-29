@@ -39,6 +39,9 @@ defmodule CrucibleKitchen.Telemetry do
       CrucibleKitchen.Telemetry.attach_handler("my-handler", events, &my_handler/4, nil)
   """
 
+  alias CrucibleKitchen.Telemetry.Handlers.Console
+  alias CrucibleKitchen.Telemetry.Handlers.JSONL
+
   @events [
     # Workflow lifecycle (span events)
     [:crucible_kitchen, :workflow, :run, :start],
@@ -89,7 +92,7 @@ defmodule CrucibleKitchen.Telemetry do
     :telemetry.attach_many(
       handler_id,
       @events,
-      &CrucibleKitchen.Telemetry.Handlers.Console.handle/4,
+      &Console.handle/4,
       nil
     )
 
@@ -103,7 +106,7 @@ defmodule CrucibleKitchen.Telemetry do
     :telemetry.attach_many(
       handler_id,
       @events,
-      &CrucibleKitchen.Telemetry.Handlers.JSONL.handle/4,
+      &JSONL.handle/4,
       %{path: path}
     )
 
@@ -179,50 +182,54 @@ defmodule CrucibleKitchen.Telemetry.Handlers.Console do
 
   @doc false
   def handle(event, measurements, metadata, _config) do
-    case event do
-      [:crucible_kitchen, :workflow, :run, :start] ->
-        Logger.info("[Kitchen] Workflow started: #{inspect(metadata[:workflow])}")
-
-      [:crucible_kitchen, :workflow, :run, :stop] ->
-        duration = measurements[:duration] || 0
-        Logger.info("[Kitchen] Workflow completed in #{format_duration(duration)}")
-
-      [:crucible_kitchen, :stage, :run, :start] ->
-        Logger.debug("[Kitchen] Stage started: #{metadata[:stage]}")
-
-      [:crucible_kitchen, :stage, :run, :stop] ->
-        duration = measurements[:duration] || 0
-
-        Logger.debug(
-          "[Kitchen] Stage #{metadata[:stage]} completed in #{format_duration(duration)}"
-        )
-
-      [:crucible_kitchen, :stage, :run, :exception] ->
-        Logger.error("[Kitchen] Stage #{metadata[:stage]} failed: #{inspect(metadata[:error])}")
-
-      [:crucible_kitchen, :training, :step] ->
-        step = metadata[:step] || 0
-        total = metadata[:total_steps] || "?"
-        loss = measurements[:loss]
-        lr = measurements[:lr]
-
-        Logger.info(
-          "[Kitchen] Step #{step}/#{total} | loss=#{format_float(loss)} | lr=#{format_float(lr, 8)}"
-        )
-
-      [:crucible_kitchen, :training, :epoch] ->
-        epoch = metadata[:epoch] || 0
-        total = metadata[:total_epochs] || "?"
-        Logger.info("[Kitchen] Epoch #{epoch + 1}/#{total} complete")
-
-      [:crucible_kitchen, :training, :checkpoint] ->
-        name = metadata[:checkpoint_name] || "checkpoint"
-        Logger.info("[Kitchen] Checkpoint saved: #{name}")
-
-      _ ->
-        :ok
-    end
+    handle_event(event, measurements, metadata)
   end
+
+  defp handle_event([:crucible_kitchen, :workflow, :run, :start], _m, metadata) do
+    Logger.info("[Kitchen] Workflow started: #{inspect(metadata[:workflow])}")
+  end
+
+  defp handle_event([:crucible_kitchen, :workflow, :run, :stop], measurements, _metadata) do
+    duration = measurements[:duration] || 0
+    Logger.info("[Kitchen] Workflow completed in #{format_duration(duration)}")
+  end
+
+  defp handle_event([:crucible_kitchen, :stage, :run, :start], _m, metadata) do
+    Logger.debug("[Kitchen] Stage started: #{metadata[:stage]}")
+  end
+
+  defp handle_event([:crucible_kitchen, :stage, :run, :stop], measurements, metadata) do
+    duration = measurements[:duration] || 0
+    Logger.debug("[Kitchen] Stage #{metadata[:stage]} completed in #{format_duration(duration)}")
+  end
+
+  defp handle_event([:crucible_kitchen, :stage, :run, :exception], _m, metadata) do
+    Logger.error("[Kitchen] Stage #{metadata[:stage]} failed: #{inspect(metadata[:error])}")
+  end
+
+  defp handle_event([:crucible_kitchen, :training, :step], measurements, metadata) do
+    step = metadata[:step] || 0
+    total = metadata[:total_steps] || "?"
+    loss = measurements[:loss]
+    lr = measurements[:lr]
+
+    Logger.info(
+      "[Kitchen] Step #{step}/#{total} | loss=#{format_float(loss)} | lr=#{format_float(lr, 8)}"
+    )
+  end
+
+  defp handle_event([:crucible_kitchen, :training, :epoch], _m, metadata) do
+    epoch = metadata[:epoch] || 0
+    total = metadata[:total_epochs] || "?"
+    Logger.info("[Kitchen] Epoch #{epoch + 1}/#{total} complete")
+  end
+
+  defp handle_event([:crucible_kitchen, :training, :checkpoint], _m, metadata) do
+    name = metadata[:checkpoint_name] || "checkpoint"
+    Logger.info("[Kitchen] Checkpoint saved: #{name}")
+  end
+
+  defp handle_event(_event, _measurements, _metadata), do: :ok
 
   defp format_duration(nanoseconds) when is_integer(nanoseconds) do
     ms = nanoseconds / 1_000_000
@@ -237,7 +244,8 @@ defmodule CrucibleKitchen.Telemetry.Handlers.Console do
   defp format_duration(_), do: "?"
 
   defp format_float(nil), do: "?"
-  defp format_float(f, precision \\ 4) when is_float(f), do: Float.round(f, precision)
+  defp format_float(f, precision \\ 4)
+  defp format_float(f, precision) when is_float(f), do: Float.round(f, precision)
   defp format_float(n, _precision), do: n
 end
 

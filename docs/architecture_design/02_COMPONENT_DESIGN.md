@@ -87,7 +87,10 @@ defmodule CrucibleKitchen do
 
       # Run a recipe with adapters
       CrucibleKitchen.run(:supervised_training, config,
-        adapters: TinkexCookbook.Adapters)
+        adapters: %{
+          training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient, []},
+          dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
+        })
 
       # Run with custom workflow
       CrucibleKitchen.run(MyWorkflow, config,
@@ -279,15 +282,22 @@ end
 defmodule CrucibleKitchen.Stages.ForwardBackward do
   use CrucibleKitchen.Stage
 
+  alias CrucibleTrain.Ports.TrainingClient
+
   def name, do: :forward_backward
 
-  def execute(%{adapters: adapters, state: state} = context) do
-    training_client = adapters.training_client
+  def execute(%{state: state} = context) do
+    ports = CrucibleKitchen.Context.get_train_ports(context)
     batch = state.current_batch
 
-    with {:ok, future} <- training_client.forward_backward(state.session, batch),
-         {:ok, result} <- training_client.await(future) do
-      {:ok, update_in(context, [:state, :last_fb_result], fn _ -> result end)}
+    future = TrainingClient.forward_backward(ports, state.session, batch)
+
+    case TrainingClient.await(ports, future) do
+      {:ok, result} ->
+        {:ok, update_in(context, [:state, :last_fb_result], fn _ -> result end)}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 end
@@ -384,72 +394,99 @@ end
 Behaviour contracts for external integrations.
 
 ```elixir
-defmodule CrucibleKitchen.Ports.TrainingClient do
+defmodule CrucibleTrain.Ports.TrainingClient do
   @moduledoc """
   Port for ML training backends.
 
   Implementations: Tinkex, Fireworks, Modal, LocalNx, Noop
   """
 
+  @type adapter_opts :: keyword()
   @type session :: term()
   @type future :: term()
   @type datum :: CrucibleTrain.Types.Datum.t()
 
-  @callback start_session(config :: map()) :: {:ok, session()} | {:error, term()}
-  @callback close_session(session()) :: :ok | {:error, term()}
-
-  @callback forward_backward(session(), [datum()]) :: {:ok, future()} | {:error, term()}
-  @callback optim_step(session(), learning_rate :: float()) :: {:ok, future()} | {:error, term()}
-  @callback await(future(), timeout :: non_neg_integer()) :: {:ok, term()} | {:error, term()}
-
-  @callback save_checkpoint(session(), name :: String.t()) :: {:ok, path :: String.t()} | {:error, term()}
-  @callback load_checkpoint(session(), path :: String.t()) :: :ok | {:error, term()}
-
-  @callback get_tokenizer(session()) :: {:ok, tokenizer :: term()} | {:error, term()}
-
-  # Optional capabilities
-  @callback supports_pipelining?() :: boolean()
-  @callback supports_distributed?() :: boolean()
-
-  @optional_callbacks [supports_pipelining?: 0, supports_distributed?: 0]
+  @callback start_session(adapter_opts(), config :: map()) :: {:ok, session()} | {:error, term()}
+  @callback forward_backward(adapter_opts(), session(), [datum()]) :: future()
+  @callback optim_step(adapter_opts(), session(), learning_rate :: float()) :: future()
+  @callback await(adapter_opts(), future()) :: {:ok, map()} | {:error, term()}
+  @callback save_checkpoint(adapter_opts(), session(), path :: String.t()) :: :ok | {:error, term()}
+  @callback load_checkpoint(adapter_opts(), session(), path :: String.t()) :: :ok | {:error, term()}
+  @callback close_session(adapter_opts(), session()) :: :ok
 end
 
-defmodule CrucibleKitchen.Ports.DatasetStore do
+defmodule CrucibleTrain.Ports.DatasetStore do
   @moduledoc """
-  Port for dataset loading and management.
+  Port for dataset loading and common dataset operations.
 
   Implementations: HfDatasets, LocalFiles, Noop
   """
 
-  @callback load(name :: String.t(), opts :: keyword()) :: {:ok, [sample()]} | {:error, term()}
-  @callback stream(name :: String.t(), opts :: keyword()) :: {:ok, Enumerable.t()} | {:error, term()}
-  @callback info(name :: String.t()) :: {:ok, dataset_info()} | {:error, term()}
+  @type adapter_opts :: keyword()
+  @type dataset :: term()
+
+  @callback load_dataset(adapter_opts(), String.t(), keyword()) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback get_split(adapter_opts(), dataset(), String.t() | atom()) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback shuffle(adapter_opts(), dataset(), keyword()) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback take(adapter_opts(), dataset(), non_neg_integer()) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback skip(adapter_opts(), dataset(), non_neg_integer()) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback select(adapter_opts(), dataset(), Range.t() | [non_neg_integer()]) ::
+              {:ok, dataset()} | {:error, term()}
+  @callback to_list(adapter_opts(), dataset()) :: {:ok, [map()]} | {:error, term()}
 end
 
-defmodule CrucibleKitchen.Ports.BlobStore do
+defmodule CrucibleTrain.Ports.BlobStore do
   @moduledoc """
-  Port for artifact storage.
+  Port for file/blob access (local or remote).
 
   Implementations: Local, S3, GCS, Noop
   """
 
-  @callback write(path :: String.t(), data :: binary()) :: :ok | {:error, term()}
-  @callback read(path :: String.t()) :: {:ok, binary()} | {:error, term()}
-  @callback exists?(path :: String.t()) :: boolean()
-  @callback list(prefix :: String.t()) :: {:ok, [String.t()]} | {:error, term()}
-  @callback delete(path :: String.t()) :: :ok | {:error, term()}
+  @type adapter_opts :: keyword()
+  @type path :: String.t()
+
+  @callback read(adapter_opts(), path()) :: {:ok, binary()} | {:error, term()}
+  @callback stream(adapter_opts(), path()) :: {:ok, Enumerable.t()} | {:error, term()}
+  @callback write(adapter_opts(), path(), iodata()) :: :ok | {:error, term()}
+  @callback exists?(adapter_opts(), path()) :: boolean()
 end
 
-defmodule CrucibleKitchen.Ports.MetricsStore do
+defmodule CrucibleTrain.Ports.HubClient do
+  @moduledoc """
+  Port for model hub operations.
+
+  Implementations: HfHub, Noop
+  """
+
+  @type adapter_opts :: keyword()
+
+  @callback download(adapter_opts(), keyword()) :: {:ok, Path.t()} | {:error, term()}
+  @callback snapshot(adapter_opts(), keyword()) :: {:ok, Path.t()} | {:error, term()}
+  @callback list_files(adapter_opts(), String.t(), keyword()) ::
+              {:ok, [String.t()]} | {:error, term()}
+end
+
+defmodule CrucibleTelemetry.Ports.MetricsStore do
   @moduledoc """
   Port for metrics persistence and querying.
 
   Implementations: JSONL, WandB, Neptune, Noop
   """
 
-  @callback record(run_id :: String.t(), metrics :: [metric()]) :: :ok | {:error, term()}
-  @callback query(run_id :: String.t(), opts :: keyword()) :: {:ok, [metric()]} | {:error, term()}
-  @callback list_runs() :: {:ok, [run_info()]} | {:error, term()}
+  @type adapter_opts :: keyword()
+  @type run_id :: String.t()
+  @type metric_name :: String.t() | atom()
+  @type value :: number()
+
+  @callback record(adapter_opts(), run_id(), metric_name(), value(), keyword()) ::
+              :ok | {:error, term()}
+  @callback flush(adapter_opts(), run_id()) :: :ok | {:error, term()}
+  @callback read(adapter_opts(), run_id()) :: {:ok, [map()]} | {:error, term()}
 end
 ```
 

@@ -82,8 +82,8 @@ crucible_kitchen/
 ## Phase 1: Core Infrastructure (Days 2-3)
 
 ### Deliverables
-- [ ] Port behaviour definitions (all 6)
-- [ ] Noop adapters for all ports
+- [ ] Port integrations (CrucibleTrain + CrucibleTelemetry)
+- [ ] Noop adapters for train/telemetry ports (plus Completer)
 - [ ] Context module
 - [ ] Stage behaviour
 - [ ] Basic stage runner (no workflow DSL yet)
@@ -93,12 +93,7 @@ crucible_kitchen/
 ```
 lib/crucible_kitchen/
 ├── ports/
-│   ├── training_client.ex
-│   ├── dataset_store.ex
-│   ├── blob_store.ex
-│   ├── hub_client.ex
-│   ├── metrics_store.ex
-│   └── vector_store.ex
+│   └── completer.ex
 ├── adapters/
 │   └── noop/
 │       ├── training_client.ex
@@ -106,7 +101,8 @@ lib/crucible_kitchen/
 │       ├── blob_store.ex
 │       ├── hub_client.ex
 │       ├── metrics_store.ex
-│       └── vector_store.ex
+│       ├── completer.ex
+│       └── tokenizer_client.ex # adapter extension, not a port
 ├── stage/
 │   ├── stage.ex          # Behaviour
 │   └── context.ex        # Flowing state
@@ -118,12 +114,12 @@ lib/crucible_kitchen/
 
 ```elixir
 # test/crucible_kitchen/ports/training_client_test.exs
-defmodule CrucibleKitchen.Ports.TrainingClientTest do
+defmodule CrucibleTrain.Ports.TrainingClientTest do
   use ExUnit.Case
 
   test "noop adapter implements all callbacks" do
     adapter = CrucibleKitchen.Adapters.Noop.TrainingClient
-    assert CrucibleKitchen.Adapters.implements?(adapter, CrucibleKitchen.Ports.TrainingClient)
+    assert CrucibleKitchen.Adapters.implements?(adapter, CrucibleTrain.Ports.TrainingClient)
   end
 end
 
@@ -303,22 +299,25 @@ end
 
 # Usage
 CrucibleKitchen.run(TinkexCookbook.Recipes.SlBasic, config,
-  adapters: TinkexCookbook.Adapters.all())
+  adapters: %{
+    training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient, []},
+    dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
+  })
 ```
 
 ### Tinker Adapter
 
 ```elixir
-defmodule TinkexCookbook.Adapters.TrainingClient do
-  @behaviour CrucibleKitchen.Ports.TrainingClient
+defmodule CrucibleKitchen.Adapters.Tinkex.TrainingClient do
+  @behaviour CrucibleTrain.Ports.TrainingClient
 
   @impl true
-  def start_session(config) do
+  def start_session(_opts, config) do
     Tinkex.TrainingClient.start(...)
   end
 
   @impl true
-  def forward_backward(session, datums) do
+  def forward_backward(_opts, session, datums) do
     # Convert CrucibleTrain types to Tinkex types
     tinkex_datums = Enum.map(datums, &convert_datum/1)
     Tinkex.TrainingClient.forward_backward_async(session, tinkex_datums)

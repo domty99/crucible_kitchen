@@ -173,12 +173,20 @@ defmodule CrucibleKitchen do
   @spec validate(module() | atom(), config()) :: :ok | {:error, [map()]}
   def validate(target, config) do
     case resolve_recipe(target) do
-      {:ok, recipe} when is_atom(recipe) and function_exported?(recipe, :config_schema, 0) ->
-        schema = recipe.config_schema()
-        if schema, do: schema.validate(config), else: :ok
+      {:ok, recipe} when is_atom(recipe) ->
+        validate_config_with_schema(recipe, config)
 
       _ ->
         :ok
+    end
+  end
+
+  defp validate_config_with_schema(recipe, config) do
+    if function_exported?(recipe, :config_schema, 0) do
+      schema = recipe.config_schema()
+      if schema, do: schema.validate(config), else: :ok
+    else
+      :ok
     end
   end
 
@@ -232,8 +240,12 @@ defmodule CrucibleKitchen do
 
   defp merge_config(target, config) do
     case resolve_recipe(target) do
-      {:ok, recipe} when function_exported?(recipe, :defaults, 0) ->
-        {:ok, Map.merge(recipe.defaults(), config)}
+      {:ok, recipe} ->
+        if function_exported?(recipe, :defaults, 0) do
+          {:ok, Map.merge(recipe.defaults(), config)}
+        else
+          {:ok, config}
+        end
 
       _ ->
         {:ok, config}
@@ -288,7 +300,6 @@ defmodule CrucibleKitchen do
   end
 
   defp workflow_name(name) when is_atom(name), do: name
-  defp workflow_name(module), do: module
 
   defp extract_stage_names(workflow_ir) do
     workflow_ir

@@ -84,17 +84,17 @@ Yet `tinkex_cookbook` bypasses all of it to make direct API calls. The "industri
 ## Core Design Principles
 
 ### 1. Inversion of Control
-Cookbooks don't call the kitchen; the kitchen calls cookbook-provided adapters.
+Cookbooks don't call the kitchen; the kitchen orchestrates and uses adapters defined in crucible_kitchen.
 
 ```elixir
-# Cookbook provides adapters
-defmodule TinkexCookbook.Adapters do
-  def training_client, do: TinkexCookbook.Adapters.TrainingClient.Tinkex
-  def dataset_store, do: TinkexCookbook.Adapters.DatasetStore.HfDatasets
-end
+# Kitchen adapters (selected by cookbook recipes/config)
+adapters = %{
+  training_client: {CrucibleKitchen.Adapters.Tinkex.TrainingClient, []},
+  dataset_store: {CrucibleKitchen.Adapters.HfDatasets.DatasetStore, []}
+}
 
 # Kitchen orchestrates using those adapters
-CrucibleKitchen.run(:sl_basic, config, adapters: TinkexCookbook.Adapters)
+CrucibleKitchen.run(:sl_basic, config, adapters: adapters)
 ```
 
 ### 2. Workflow-Centric (Not Just Ports/Adapters)

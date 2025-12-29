@@ -1,9 +1,21 @@
-# Crucible Kitchen
+<p align="center">
+  <img src="assets/crucible_kitchen.svg" alt="Crucible Kitchen" width="200" />
+</p>
 
-Industrial ML training orchestration - backend-agnostic workflow engine for supervised, reinforcement, and preference learning.
+<h1 align="center">Crucible Kitchen</h1>
 
-[![Hex Version](https://img.shields.io/hexpm/v/crucible_kitchen.svg)](https://hex.pm/packages/crucible_kitchen)
-[![Docs](https://img.shields.io/badge/docs-hexpm-blue.svg)](https://hexdocs.pm/crucible_kitchen)
+<p align="center">
+  <strong>Industrial ML training orchestration — backend-agnostic workflow engine for supervised, reinforcement, and preference learning.</strong>
+</p>
+
+<p align="center">
+  <a href="https://hex.pm/packages/crucible_kitchen"><img src="https://img.shields.io/hexpm/v/crucible_kitchen.svg?style=flat-square&color=6e4a7e" alt="Hex Version" /></a>
+  <a href="https://hexdocs.pm/crucible_kitchen"><img src="https://img.shields.io/badge/docs-hexdocs-5e60ce?style=flat-square" alt="Docs" /></a>
+  <a href="https://github.com/North-Shore-AI/crucible_kitchen/actions"><img src="https://img.shields.io/github/actions/workflow/status/North-Shore-AI/crucible_kitchen/ci.yml?style=flat-square&label=CI" alt="CI Status" /></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-green.svg?style=flat-square" alt="License" /></a>
+</p>
+
+---
 
 ## Overview
 
@@ -17,22 +29,22 @@ Crucible Kitchen is the missing orchestration layer that makes ML cookbooks triv
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    COOKBOOK FRONTENDS                            │
+│                    COOKBOOK FRONTENDS                           │
 │  tinkex_cookbook    fireworks_cookbook    modal_cookbook        │
 │  (config + adapters only, <2K LOC each)                         │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     CRUCIBLE KITCHEN                             │
+│                     CRUCIBLE KITCHEN                            │
 │  Recipes → Workflows → Stages → Ports                           │
 │  (backend-agnostic orchestration)                               │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    BACKEND ADAPTERS                              │
-│  Tinker, Fireworks, Modal, LocalNx, Noop (testing)             │
+│                    BACKEND ADAPTERS                             │
+│  Tinker, Fireworks, Modal, LocalNx, Noop (testing)              │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -135,10 +147,11 @@ defmodule ForwardBackwardStage do
 
   @impl true
   def execute(context) do
-    client = get_adapter(context, :training_client)
+    ports = get_train_ports(context)
+    session = get_state(context, :session)
     batch = get_state(context, :current_batch)
 
-    {:ok, future} = client.forward_backward(get_state(context, :session), batch)
+    future = CrucibleTrain.Ports.TrainingClient.forward_backward(ports, session, batch)
     {:ok, put_state(context, :fb_future, future)}
   end
 end
@@ -146,23 +159,24 @@ end
 
 ### Ports & Adapters
 
-Behaviour contracts for external integrations. The kitchen defines ports; cookbooks provide adapters.
+Behaviour contracts for external integrations. CrucibleTrain and CrucibleTelemetry define ports; cookbooks provide adapters.
 
 ```elixir
-# Port (in crucible_kitchen)
-defmodule CrucibleKitchen.Ports.TrainingClient do
-  @callback start_session(config :: map()) :: {:ok, session} | {:error, term()}
-  @callback forward_backward(session, datums) :: {:ok, future} | {:error, term()}
-  @callback optim_step(session, lr :: float()) :: {:ok, future} | {:error, term()}
+# Port (in crucible_train)
+defmodule CrucibleTrain.Ports.TrainingClient do
+  @callback start_session(adapter_opts, config :: map()) :: {:ok, session} | {:error, term()}
+  @callback forward_backward(adapter_opts, session, datums) :: future
+  @callback optim_step(adapter_opts, session, lr :: float()) :: future
+  @callback await(adapter_opts, future) :: {:ok, map()} | {:error, term()}
   # ...
 end
 
 # Adapter (in your cookbook)
 defmodule MyCookbook.Adapters.TrainingClient do
-  @behaviour CrucibleKitchen.Ports.TrainingClient
+  @behaviour CrucibleTrain.Ports.TrainingClient
 
   @impl true
-  def start_session(config) do
+  def start_session(_opts, config) do
     # Backend-specific implementation
   end
   # ...
@@ -214,28 +228,15 @@ Use noop adapters for testing without a real backend:
 - [Telemetry](docs/guides/telemetry.md)
 - [API Reference](https://hexdocs.pm/crucible_kitchen)
 
-## Design Documents
-
-The architecture design is documented in:
-- [Architecture Overview](docs/architecture/00_EXECUTIVE_SUMMARY.md)
-- [Architecture Patterns](docs/architecture/01_ARCHITECTURE_PATTERNS.md)
-- [Component Design](docs/architecture/02_COMPONENT_DESIGN.md)
-- [Workflow Engine](docs/architecture/03_WORKFLOW_ENGINE.md)
-- [API Surface](docs/architecture/04_API_SURFACE.md)
-
 ## Part of the Crucible Ecosystem
 
 Crucible Kitchen integrates with:
-- `crucible_train` - Types, renderers, training primitives
-- `crucible_ir` - Experiment specifications
-- `crucible_framework` - Pipeline orchestration
-- `crucible_telemetry` - Research-grade instrumentation
-- `crucible_harness` - Batch experiment management
+- `crucible_train` — Types, renderers, training primitives
+- `crucible_ir` — Experiment specifications
+- `crucible_framework` — Pipeline orchestration
+- `crucible_telemetry` — Research-grade instrumentation
+- `crucible_harness` — Batch experiment management
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
-
-## Contributing
-
-Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+MIT License

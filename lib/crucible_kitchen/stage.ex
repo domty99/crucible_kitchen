@@ -97,6 +97,7 @@ defmodule CrucibleKitchen.Stage.Helpers do
   defdelegate put_state(context, key, value), to: Context
   defdelegate merge_state(context, updates), to: Context
   defdelegate get_adapter(context, port), to: Context
+  defdelegate get_train_ports(context), to: Context
   defdelegate record_metric(context, name, value), to: Context
   defdelegate record_metric(context, name, value, opts), to: Context
 end

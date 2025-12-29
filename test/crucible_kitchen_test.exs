@@ -3,6 +3,7 @@ defmodule CrucibleKitchenTest do
   doctest CrucibleKitchen
 
   alias CrucibleKitchen.Context
+  alias CrucibleKitchen.Workflow.Runner
 
   describe "Context" do
     test "new/2 creates context with config and adapters" do
@@ -79,10 +80,12 @@ defmodule CrucibleKitchenTest do
       use CrucibleKitchen.Workflow
 
       workflow do
-        loop :items, over: fn ctx -> Context.get_config(ctx, :items, []) end do
+        loop :items, over: :items_range do
           stage(:process, TestStage)
         end
       end
+
+      def items_range(ctx), do: Context.get_config(ctx, :items, [])
     end
 
     test "workflow with loop" do
@@ -118,7 +121,7 @@ defmodule CrucibleKitchenTest do
     test "runs stages in sequence" do
       context = Context.new(%{}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
 
-      {:ok, result} = CrucibleKitchen.Workflow.Runner.run(CountingWorkflow, context)
+      {:ok, result} = Runner.run(CountingWorkflow, context)
 
       assert Context.get_state(result, :count) == 3
     end
@@ -127,16 +130,18 @@ defmodule CrucibleKitchenTest do
       use CrucibleKitchen.Workflow
 
       workflow do
-        loop :iterations, over: fn _ctx -> 1..5 end do
+        loop :iterations, over: :iterations_range do
           stage(:count, CountingStage)
         end
       end
+
+      def iterations_range(_ctx), do: 1..5
     end
 
     test "runs loop iterations" do
       context = Context.new(%{}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
 
-      {:ok, result} = CrucibleKitchen.Workflow.Runner.run(LoopCountingWorkflow, context)
+      {:ok, result} = Runner.run(LoopCountingWorkflow, context)
 
       assert Context.get_state(result, :count) == 5
     end
@@ -145,17 +150,19 @@ defmodule CrucibleKitchenTest do
       use CrucibleKitchen.Workflow
 
       workflow do
-        conditional fn ctx -> Context.get_config(ctx, :do_it, false) end do
+        conditional :should_do_it? do
           stage(:count, CountingStage)
         end
       end
+
+      def should_do_it?(ctx), do: Context.get_config(ctx, :do_it, false)
     end
 
     test "conditional executes when true" do
       context =
         Context.new(%{do_it: true}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
 
-      {:ok, result} = CrucibleKitchen.Workflow.Runner.run(ConditionalWorkflow, context)
+      {:ok, result} = Runner.run(ConditionalWorkflow, context)
       assert Context.get_state(result, :count) == 1
     end
 
@@ -163,8 +170,61 @@ defmodule CrucibleKitchenTest do
       context =
         Context.new(%{do_it: false}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
 
-      {:ok, result} = CrucibleKitchen.Workflow.Runner.run(ConditionalWorkflow, context)
+      {:ok, result} = Runner.run(ConditionalWorkflow, context)
       assert Context.get_state(result, :count, 0) == 0
+    end
+
+    defmodule StreamLoopWorkflow do
+      use CrucibleKitchen.Workflow
+
+      workflow do
+        stream_loop :items, over: :item_stream, prefetch: 2 do
+          stage(:count, CountingStage)
+        end
+      end
+
+      def item_stream(_ctx) do
+        Stream.take(1..10, 5)
+      end
+    end
+
+    test "stream_loop processes items lazily" do
+      context = Context.new(%{}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
+
+      {:ok, result} = Runner.run(StreamLoopWorkflow, context)
+      assert Context.get_state(result, :count) == 5
+    end
+
+    defmodule AsyncLoopWorkflow do
+      use CrucibleKitchen.Workflow
+
+      workflow do
+        async_loop :producer_consumer,
+          producer: :produce_item,
+          stop_when: :should_stop?,
+          buffer_size: 2 do
+          stage(:count, CountingStage)
+        end
+      end
+
+      def produce_item(ctx) do
+        # Produce a simple item
+        count = Context.get_state(ctx, :produced, 0)
+        count + 1
+      end
+
+      def should_stop?(ctx) do
+        # Stop after consuming 5 items
+        Context.get_state(ctx, :count, 0) >= 5
+      end
+    end
+
+    test "async_loop runs producer-consumer pattern" do
+      context = Context.new(%{}, %{training_client: NoopAdapter, dataset_store: NoopAdapter})
+
+      {:ok, result} = Runner.run(AsyncLoopWorkflow, context)
+      # Should have consumed at least 5 items
+      assert Context.get_state(result, :count) >= 5
     end
   end
 end

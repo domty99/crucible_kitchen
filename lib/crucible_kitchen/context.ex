@@ -45,12 +45,11 @@ defmodule CrucibleKitchen.Context do
   ]
 
   @type adapter_map :: %{
-          required(:training_client) => module(),
-          required(:dataset_store) => module(),
-          optional(:blob_store) => module(),
-          optional(:hub_client) => module(),
-          optional(:metrics_store) => module(),
-          optional(:vector_store) => module()
+          required(:training_client) => module() | {module(), keyword()},
+          required(:dataset_store) => module() | {module(), keyword()},
+          optional(:blob_store) => module() | {module(), keyword()},
+          optional(:hub_client) => module() | {module(), keyword()},
+          optional(:metrics_store) => module() | {module(), keyword()}
         }
 
   @type metric :: %{
@@ -124,17 +123,53 @@ defmodule CrucibleKitchen.Context do
 
   @doc """
   Get an adapter by port name.
+
+  Returns `nil` if not found, or `{module, opts}` tuple.
   """
-  @spec get_adapter(t(), atom()) :: module() | nil
+  @spec get_adapter(t(), atom()) :: {module(), keyword()} | nil
   def get_adapter(%__MODULE__{adapters: adapters}, port) do
-    Map.get(adapters, port)
+    CrucibleKitchen.Ports.resolve(adapters, port)
+  end
+
+  @doc """
+  Get an adapter by port name, raising if not found.
+
+  Returns `{module, opts}` tuple.
+  """
+  @spec get_adapter!(t(), atom()) :: {module(), keyword()}
+  def get_adapter!(%__MODULE__{adapters: adapters}, port) do
+    CrucibleKitchen.Ports.resolve!(adapters, port)
+  end
+
+  @doc """
+  Build a CrucibleTrain.Ports struct from the training-related adapters.
+  """
+  @spec get_train_ports(t()) :: CrucibleTrain.Ports.t()
+  def get_train_ports(%__MODULE__{adapters: adapters}) do
+    train_adapters =
+      Map.take(adapters, [
+        :training_client,
+        :dataset_store,
+        :hub_client,
+        :blob_store,
+        :llm_client,
+        :embedding_client,
+        :vector_store
+      ])
+
+    CrucibleTrain.Ports.new(ports: train_adapters)
   end
 
   @doc """
   Record a metric.
   """
   @spec record_metric(t(), atom(), number(), keyword()) :: t()
-  def record_metric(%__MODULE__{metrics: metrics, state: state} = context, name, value, opts \\ []) do
+  def record_metric(
+        %__MODULE__{metrics: metrics, state: state} = context,
+        name,
+        value,
+        opts \\ []
+      ) do
     step = Keyword.get(opts, :step, Map.get(state, :global_step, 0))
     metadata = Keyword.get(opts, :metadata, %{})
 

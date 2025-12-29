@@ -360,36 +360,41 @@ For backends that support async pipelining (like Tinker), stages can overlap:
 defmodule CrucibleKitchen.Stages.ForwardBackward do
   use CrucibleKitchen.Stage
 
+  alias CrucibleKitchen.Context
+  alias CrucibleTrain.Ports.TrainingClient
+
   @impl true
   def execute(context) do
-    %{adapters: %{training_client: client}, state: state} = context
+    ports = Context.get_train_ports(context)
+    session = Context.get_state(context, :session)
+    batch = Context.get_state(context, :current_batch)
 
-    # Check if backend supports pipelining
-    if function_exported?(client, :supports_pipelining?, 0) && client.supports_pipelining?() do
-      # Submit async, return future in context
-      {:ok, future} = client.forward_backward_async(state.session, state.current_batch)
-      {:ok, Context.put_state(context, :fb_future, future)}
-    else
-      # Sync execution
-      {:ok, result} = client.forward_backward(state.session, state.current_batch)
-      {:ok, Context.put_state(context, :fb_result, result)}
-    end
+    future = TrainingClient.forward_backward(ports, session, batch)
+    {:ok, Context.put_state(context, :fb_future, future)}
   end
 end
 
 defmodule CrucibleKitchen.Stages.AwaitFuture do
   use CrucibleKitchen.Stage
 
+  alias CrucibleKitchen.Context
+  alias CrucibleTrain.Ports.TrainingClient
+
   @impl true
   def execute(context) do
+    ports = Context.get_train_ports(context)
     key = context.stage_opts[:key]
     future = Context.get_state(context, key)
 
     if future do
-      client = context.adapters.training_client
-      {:ok, result} = client.await(future)
-      result_key = String.to_atom("#{key}_result")
-      {:ok, Context.put_state(context, result_key, result)}
+      case TrainingClient.await(ports, future) do
+        {:ok, result} ->
+          result_key = String.to_atom("#{key}_result")
+          {:ok, Context.put_state(context, result_key, result)}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
     else
       {:ok, context}
     end
