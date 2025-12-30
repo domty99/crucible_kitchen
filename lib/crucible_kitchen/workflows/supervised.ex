@@ -51,6 +51,7 @@ defmodule CrucibleKitchen.Workflows.Supervised do
     LogEpochMetrics,
     LogStepMetrics,
     OptimStep,
+    RegisterModel,
     SaveCheckpoint,
     SaveFinalWeights,
     SetEpoch
@@ -89,6 +90,12 @@ defmodule CrucibleKitchen.Workflows.Supervised do
 
     # Finalize
     stage(:save_final, SaveFinalWeights)
+
+    # Final evaluation and registration
+    stage(:final_evaluate, Evaluate)
+    stage(:register_model, RegisterModel)
+
+    # Cleanup
     stage(:cleanup, Cleanup)
   end
 

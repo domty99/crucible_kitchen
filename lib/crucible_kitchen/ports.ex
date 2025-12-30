@@ -40,6 +40,9 @@ defmodule CrucibleKitchen.Ports do
   | `:blob_store` | Artifact storage (checkpoints, weights) |
   | `:hub_client` | Model hub (HuggingFace, etc.) |
   | `:metrics_store` | Metrics persistence |
+  | `:model_registry` | Model versioning and registration |
+  | `:evaluator` | Model evaluation |
+  | `:feedback_client` | Production feedback and retraining triggers |
   """
 
   @type adapter_spec :: module() | {module(), keyword()}
@@ -140,5 +143,8 @@ defmodule CrucibleKitchen.Ports do
   defp port_behaviour(:blob_store), do: CrucibleTrain.Ports.BlobStore
   defp port_behaviour(:hub_client), do: CrucibleTrain.Ports.HubClient
   defp port_behaviour(:metrics_store), do: CrucibleTelemetry.Ports.MetricsStore
+  defp port_behaviour(:model_registry), do: CrucibleKitchen.Ports.ModelRegistry
+  defp port_behaviour(:evaluator), do: CrucibleKitchen.Ports.Evaluator
+  defp port_behaviour(:feedback_client), do: CrucibleKitchen.Ports.FeedbackClient
   defp port_behaviour(_), do: nil
 end

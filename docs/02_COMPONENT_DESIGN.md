@@ -39,7 +39,8 @@ crucible_kitchen/
 │   │   │       ├── forward_backward.ex
 │   │   │       ├── optim_step.ex
 │   │   │       ├── checkpoint.ex
-│   │   │       ├── evaluate.ex
+│   │   │       ├── evaluate.ex          # Model evaluation with metrics
+│   │   │       ├── register_model.ex    # Model registry integration
 │   │   │       └── save_weights.ex
 │   │   │
 │   │   ├── ports/                       # Port Layer
@@ -48,7 +49,8 @@ crucible_kitchen/
 │   │   │   ├── blob_store.ex            # Artifact storage
 │   │   │   ├── hub_client.ex            # Model hub
 │   │   │   ├── metrics_store.ex         # Metrics persistence
-│   │   │   ├── vector_store.ex          # Embeddings
+│   │   │   ├── model_registry.ex        # Model versioning & lineage
+│   │   │   ├── evaluator.ex             # Model evaluation
 │   │   │   └── noop/                    # Noop implementations
 │   │   │       └── *.ex
 │   │   │

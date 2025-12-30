@@ -59,6 +59,12 @@ defmodule CrucibleKitchen.Telemetry do
     [:crucible_kitchen, :training, :checkpoint],
     [:crucible_kitchen, :training, :eval],
 
+    # Evaluation events
+    [:crucible_kitchen, :eval, :complete],
+
+    # Model registry events
+    [:crucible_kitchen, :model, :registered],
+
     # Dataset events
     [:crucible_kitchen, :dataset, :load],
     [:crucible_kitchen, :dataset, :batch]
@@ -227,6 +233,29 @@ defmodule CrucibleKitchen.Telemetry.Handlers.Console do
   defp handle_event([:crucible_kitchen, :training, :checkpoint], _m, metadata) do
     name = metadata[:checkpoint_name] || "checkpoint"
     Logger.info("[Kitchen] Checkpoint saved: #{name}")
+  end
+
+  defp handle_event([:crucible_kitchen, :eval, :complete], measurements, metadata) do
+    model = metadata[:model] || "model"
+    accuracy = Map.get(measurements, :accuracy)
+    f1 = Map.get(measurements, :f1)
+
+    metrics_str =
+      [
+        if(accuracy, do: "acc=#{format_float(accuracy)}"),
+        if(f1, do: "f1=#{format_float(f1)}")
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+
+    Logger.info("[Kitchen] Evaluation complete for #{model}: #{metrics_str}")
+  end
+
+  defp handle_event([:crucible_kitchen, :model, :registered], _m, metadata) do
+    name = metadata[:name] || "model"
+    version = metadata[:version] || "?"
+    id = metadata[:model_id] || "?"
+    Logger.info("[Kitchen] Model registered: #{name} v#{version} (id: #{id})")
   end
 
   defp handle_event(_event, _measurements, _metadata), do: :ok

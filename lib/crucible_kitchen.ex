@@ -60,6 +60,7 @@ defmodule CrucibleKitchen do
   - `:reinforcement` - RL with rollouts and PPO (GRPO, etc.)
   - `:preference` - Direct Preference Optimization (DPO)
   - `:distillation` - Knowledge distillation (on-policy, multi-teacher)
+  - `:feedback_loop` - Production feedback-driven retraining pipeline
 
   ## Documentation
 
@@ -94,7 +95,8 @@ defmodule CrucibleKitchen do
     supervised: CrucibleKitchen.Workflows.Supervised,
     reinforcement: CrucibleKitchen.Workflows.Reinforcement,
     preference: CrucibleKitchen.Workflows.Preference,
-    distillation: CrucibleKitchen.Workflows.Distillation
+    distillation: CrucibleKitchen.Workflows.Distillation,
+    feedback_loop: CrucibleKitchen.Workflows.FeedbackLoop
   }
 
   # ============================================================================

@@ -49,7 +49,10 @@ defmodule CrucibleKitchen.Context do
           required(:dataset_store) => module() | {module(), keyword()},
           optional(:blob_store) => module() | {module(), keyword()},
           optional(:hub_client) => module() | {module(), keyword()},
-          optional(:metrics_store) => module() | {module(), keyword()}
+          optional(:metrics_store) => module() | {module(), keyword()},
+          optional(:model_registry) => module() | {module(), keyword()},
+          optional(:evaluator) => module() | {module(), keyword()},
+          optional(:feedback_client) => module() | {module(), keyword()}
         }
 
   @type metric :: %{
